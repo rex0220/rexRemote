@@ -5,10 +5,10 @@ tags:
   - macOS
   - C#
   - WPF
-  - Tailscale
+  - tailscale
 private: false
 updated_at: ''
-id: null
+id: 15867acecbd8e53724c6
 organization_url_name: null
 slide: false
 ignorePublish: false
@@ -25,6 +25,8 @@ kintone プラグインの開発環境を、Surface Laptop（Windows）から Ma
 macOS には VNC 互換の「画面共有」が標準で入っているので、Windows から VNC で入れます。ただ、汎用の VNC ビューアは Mac 特有の点（macOS のユーザー名とパスワードによる認証、Command キー、Retina の 4K 画面）でひと手間かかります。そこで、**Mac につなぐことだけに絞ったシンプルな VNC クライアント「rexRemote」** を作りました。
 
 https://github.com/rex0220/rexRemote
+
+![image.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/100572/e52732c2-6d84-4c21-a6e5-d9dfc5e41036.png)
 
 ## rexRemote でできること
 
