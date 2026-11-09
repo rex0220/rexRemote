@@ -1,0 +1,10 @@
+<Project>
+  <!-- src/ 配下では外部 NuGet パッケージを禁止する（SDK が暗黙に追加するものは除く） -->
+  <Target Name="RexForbidPackageReferences" BeforeTargets="CollectPackageReferences;Restore;Build">
+    <ItemGroup>
+      <_RexExplicitPackage Include="@(PackageReference)" Condition="'%(PackageReference.IsImplicitlyDefined)' != 'true'" />
+    </ItemGroup>
+    <Error Condition="'@(_RexExplicitPackage)' != ''"
+           Text="src/ 配下では外部 NuGet パッケージは使用禁止です（BCL のみで実装する）: @(_RexExplicitPackage)" />
+  </Target>
+</Project>

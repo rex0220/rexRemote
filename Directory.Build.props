@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <!-- ターゲットフレームワークはここで一元管理する（App は $(RexTargetFramework)-windows） -->
+    <RexTargetFramework>net10.0</RexTargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AnalysisLevel>latest</AnalysisLevel>
+
+    <!-- バージョンはここで一元管理する（ヘルプ画面とコマンドラインのバージョン表示に使う。XML コメント内に連続ハイフンは書けない） -->
+    <Version>0.1.0</Version>
+    <Product>rexRemote</Product>
+    <Authors>rex0220</Authors>
+    <Copyright>Copyright (c) 2026 rex0220</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,122 @@
+<Window x:Class="RexRemote.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="rexRemote"
+        Width="1280" Height="820"
+        UseLayoutRounding="True"
+        Background="#FF1E1E1E">
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Background="#FFF9F9F9" BorderBrush="#FFE5E5E5" BorderThickness="0,0,0,1" Padding="10,8">
+            <StackPanel Orientation="Horizontal">
+                <Label Content="ホスト(_H)" Target="{Binding ElementName=HostBox}" VerticalAlignment="Center" />
+                <!-- 入力も履歴からの選択もできる。選択時に編集欄へ入るのはホスト名だけ（TextSearch.TextPath） -->
+                <ComboBox x:Name="HostBox" Width="240" Height="30" IsEditable="True" Text="localhost" VerticalContentAlignment="Center" Padding="6,2"
+                          TextSearch.TextPath="Host" SelectionChanged="OnHostSelectionChanged"
+                          ToolTip="接続に成功した接続先を新しい順に最大 10 件まで覚えます">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center">
+                                    <Run Text="{Binding Host, Mode=OneWay}" /><Run Text="{Binding PortSuffix, Mode=OneWay}" Foreground="Gray" />
+                                </TextBlock>
+                                <!-- 履歴から削除。押しても項目は選択されない（Button がマウス操作を処理するため） -->
+                                <Button Grid.Column="1" Style="{StaticResource SubtleIconButton}" Content="&#xE711;" Margin="12,0,0,0"
+                                        Focusable="False" Tag="{Binding}" Click="OnRemoveHistoryClick" ToolTip="履歴から削除" />
+                            </Grid>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Label Content="ポート(_O)" Target="{Binding ElementName=PortBox}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                <TextBox x:Name="PortBox" Width="60" Height="30" Text="5900" VerticalContentAlignment="Center" Padding="4,2" />
+                <!-- 接続中はリモート画面がキーボードフォーカスを持ち続けるよう、ツールバーのボタン類はフォーカスを取らない -->
+                <!-- 接続ボタンの文字・アイコン・色は状態に応じてコードで切り替える（SetConnectButtonState） -->
+                <Button x:Name="ConnectButton" Style="{StaticResource AccentButton}" MinWidth="88" Margin="12,0,0,0"
+                        Click="OnConnectClick" Focusable="False">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="ConnectIcon" Style="{StaticResource ButtonIcon}" Text="&#xE703;" />
+                        <TextBlock x:Name="ConnectText" Text="接続" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="TypePasswordButton" Margin="8,0,0,0" Click="OnTypePasswordClick" Focusable="False" IsEnabled="False"
+                        ToolTip="Mac のロック画面・ログイン画面に、接続に使ったパスワードを入力して Enter を押します">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource ButtonIcon}" Text="&#xE8D7;" />
+                        <TextBlock Text="パスワード入力" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="ScreenshotButton" Margin="8,0,0,0" Click="OnScreenshotClick" Focusable="False" IsEnabled="False"
+                        ToolTip="Mac の画面を元の解像度で PNG に保存し（ピクチャ\rexRemote）、クリップボードにもコピーします">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource ButtonIcon}" Text="&#xE722;" />
+                        <TextBlock Text="スクリーンショット" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Label Content="表示" Margin="12,0,0,0" VerticalAlignment="Center" />
+                <ComboBox x:Name="ScaleModeBox" Width="190" Height="30" Focusable="False" VerticalContentAlignment="Center" Padding="6,2"
+                          SelectionChanged="OnScaleModeChanged"
+                          ToolTip="50%（Retina 等倍）: 4K の Mac を見た目の解像度（1920x1080）でくっきり表示します">
+                    <ComboBoxItem Content="ウィンドウに合わせる" Tag="Fit" />
+                    <ComboBoxItem Content="50%（Retina 等倍）" Tag="Half" />
+                    <ComboBoxItem Content="100%（ドット等倍）" Tag="Full" />
+                </ComboBox>
+                <!-- 設定パネル（オン／オフの設定をまとめる。値は settings.json に保存） -->
+                <ToggleButton x:Name="SettingsButton" Style="{StaticResource ModernToggleButton}" Margin="12,0,0,0"
+                              Padding="9,0" MinWidth="0" Focusable="False" ToolTip="設定">
+                    <TextBlock Style="{StaticResource ButtonIcon}" Margin="0" Text="&#xE713;" />
+                </ToggleButton>
+                <Button x:Name="HelpButton" Margin="8,0,0,0" Padding="9,0" MinWidth="0" Focusable="False"
+                        Click="OnHelpClick" ToolTip="ヘルプとバージョン情報">
+                    <TextBlock Style="{StaticResource ButtonIcon}" Margin="0" Text="&#xE897;" />
+                </Button>
+                <Popup x:Name="SettingsPopup" PlacementTarget="{Binding ElementName=SettingsButton}" Placement="Bottom"
+                       StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade"
+                       IsOpen="{Binding IsChecked, ElementName=SettingsButton, Mode=TwoWay}">
+                    <Grid Margin="0,4,12,12">
+                        <Border Style="{StaticResource PopupPanel}">
+                            <StackPanel>
+                                <CheckBox x:Name="SwapCtrlCmdCheckBox" Style="{StaticResource ToggleSwitch}" Content="Ctrl ⇔ Cmd 入れ替え"
+                                          Focusable="False" Checked="OnSettingToggled" Unchecked="OnSettingToggled"
+                                          ToolTip="オン: Ctrl キーを Mac の Command、Win キーを Control として送る" />
+                                <CheckBox x:Name="ClipboardCheckBox" Style="{StaticResource ToggleSwitch}" Content="クリップボードを共有"
+                                          Margin="0,12,0,0" Focusable="False" Checked="OnSettingToggled" Unchecked="OnSettingToggled"
+                                          ToolTip="VNC 標準のクリップボード共有。macOS の画面共有（macOS 27 で確認）では反映されません。ほかの VNC サーバー向け" />
+                                <TextBlock Text="macOS の画面共有では動作しません" Margin="48,2,0,0" FontSize="11" Foreground="#6E6E6E" />
+                                <CheckBox x:Name="AutoReconnectCheckBox" Style="{StaticResource ToggleSwitch}" Content="切れたら自動で再接続"
+                                          Margin="0,12,0,0" Focusable="False" Checked="OnSettingToggled" Unchecked="OnSettingToggled"
+                                          ToolTip="回線の瞬断などで切れたとき、保存したパスワードで自動的につなぎ直します" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Popup>
+            </StackPanel>
+        </Border>
+
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="StatusText" Text="未接続" />
+            </StatusBarItem>
+        </StatusBar>
+
+        <ScrollViewer x:Name="Scroller" Background="Black" Focusable="False"
+                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
+            <!-- 縦横比が合わない余白は下にまとめる（例: 3:2 のモニターに 16:9 の Mac を表示すると上下が余る） -->
+            <Image x:Name="RemoteImage"
+                   Stretch="Uniform"
+                   HorizontalAlignment="Center" VerticalAlignment="Top"
+                   Focusable="True" FocusVisualStyle="{x:Null}"
+                   InputMethod.IsInputMethodEnabled="False"
+                   GotKeyboardFocus="OnRemoteGotKeyboardFocus"
+                   LostKeyboardFocus="OnRemoteLostKeyboardFocus"
+                   SizeChanged="OnRemoteImageSizeChanged"
+                   MouseMove="OnRemoteMouseMove"
+                   MouseDown="OnRemoteMouseDown"
+                   MouseUp="OnRemoteMouseUp"
+                   MouseWheel="OnRemoteMouseWheel"
+                   LostMouseCapture="OnRemoteLostMouseCapture" />
+        </ScrollViewer>
+    </DockPanel>
+</Window>

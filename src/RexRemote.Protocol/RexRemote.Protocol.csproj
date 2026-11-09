@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>$(RexTargetFramework)</TargetFramework>
+    <RootNamespace>RexRemote.Protocol</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="RexRemote.Protocol.Tests" />
+  </ItemGroup>
+
+</Project>
