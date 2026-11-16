@@ -40,6 +40,13 @@ public partial class MainWindow : Window
     // マウス状態
     private RfbButtons _buttons;
     private int _wheelAccumulator;
+    private readonly ScrollInputStats _scrollStats = new(System.Windows.Threading.Dispatcher.CurrentDispatcher);
+
+    private const int WM_MOUSEWHEEL = 0x020A;
+    private const int WM_MOUSEHWHEEL = 0x020E;
+    private const int WM_GESTURE = 0x0119;
+    private const int WM_POINTERFIRST = 0x0245;
+    private const int WM_POINTERLAST = 0x0257;
     private (int X, int Y, RfbButtons Buttons) _lastPointer = (-1, -1, RfbButtons.None);
 
     // 表示
@@ -844,6 +851,8 @@ public partial class MainWindow : Window
         SwapCtrlCmdCheckBox.IsChecked = _settings.SwapControlAndCommand;
         ClipboardCheckBox.IsChecked = _settings.ClipboardSharing;
         AutoReconnectCheckBox.IsChecked = _settings.AutoReconnect;
+        ScrollMultiplierBox.SelectedItem = ScrollMultiplierBox.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => (string)item.Tag == _settings.ScrollMultiplier.ToString());
         lock (_keyboard)
         {
             _keyboard.SwapControlAndCommand = _settings.SwapControlAndCommand;
@@ -859,6 +868,17 @@ public partial class MainWindow : Window
                 RemoteImage.Focus();
             }
         };
+    }
+
+    private void OnScrollMultiplierChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_initialized || ScrollMultiplierBox.SelectedItem is not ComboBoxItem { Tag: string tag } || !int.TryParse(tag, out int value))
+        {
+            return;
+        }
+
+        _settings.ScrollMultiplier = value;
+        _settings.Save();
     }
 
     private void OnHelpClick(object sender, RoutedEventArgs e)
@@ -926,9 +946,38 @@ public partial class MainWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == WM_CLIPBOARDUPDATE)
+        switch (msg)
         {
-            OnWindowsClipboardChanged();
+            case WM_CLIPBOARDUPDATE:
+                OnWindowsClipboardChanged();
+                break;
+
+            case WM_MOUSEWHEEL:
+                _scrollStats.WindowWheel++;
+                _scrollStats.Touch();
+                break;
+
+            case WM_MOUSEHWHEEL:
+                _scrollStats.WindowHorizontalWheel++;
+                _scrollStats.Touch();
+                if (OnHorizontalWheel(wParam, lParam))
+                {
+                    // 処理したことを示す（タッチパッドのドライバーが代わりに WM_HSCROLL を送ってくるのを防ぐ）
+                    handled = true;
+                    return 1;
+                }
+
+                break;
+
+            case WM_GESTURE:
+                _scrollStats.Gesture++;
+                _scrollStats.Touch();
+                break;
+
+            case >= WM_POINTERFIRST and <= WM_POINTERLAST:
+                _scrollStats.Pointer++;
+                _scrollStats.Touch();
+                break;
         }
 
         return IntPtr.Zero;
@@ -1140,22 +1189,64 @@ public partial class MainWindow : Window
 
     private void OnRemoteMouseWheel(object sender, MouseWheelEventArgs e)
     {
+        _scrollStats.RecordWheel(e.Delta);
         if (!TryMapPoint(e, out int x, out int y))
         {
+            _scrollStats.Unmapped++;
             return;
         }
 
         // 高分解能ホイール（タッチパッド）は 120 単位に貯めてから送る。ホイールは押して離すで 1 段
-        _wheelAccumulator += e.Delta;
-        while (Math.Abs(_wheelAccumulator) >= WheelStep)
+        _scrollStats.ClicksSent += SendWheelClicks(e.Delta, ref _wheelAccumulator, RfbButtons.WheelUp, RfbButtons.WheelDown, x, y);
+        e.Handled = true;
+    }
+
+    private int _horizontalWheelAccumulator;
+
+    /// <summary>
+    /// 横スクロール（WM_MOUSEHWHEEL）。WPF は横スクロールのイベントを出さないのでウィンドウのメッセージを直接処理し、
+    /// VNC のボタン 6（左）/ 7（右）として送る。カーソルがリモート画面の上にあるときだけ。
+    /// </summary>
+    private bool OnHorizontalWheel(IntPtr wParam, IntPtr lParam)
+    {
+        if (_session is null)
         {
-            RfbButtons wheel = _wheelAccumulator > 0 ? RfbButtons.WheelUp : RfbButtons.WheelDown;
-            _session!.Client.SendPointerEvent(_buttons | wheel, x, y);
-            _session.Client.SendPointerEvent(_buttons, x, y);
-            _wheelAccumulator -= Math.Sign(_wheelAccumulator) * WheelStep;
+            return false;
         }
 
-        e.Handled = true;
+        int delta = (short)(((long)wParam >> 16) & 0xFFFF);
+        var screen = new Point((short)((long)lParam & 0xFFFF), (short)(((long)lParam >> 16) & 0xFFFF));
+        Point p = RemoteImage.PointFromScreen(screen);
+        if (p.X < 0 || p.Y < 0 || p.X >= RemoteImage.ActualWidth || p.Y >= RemoteImage.ActualHeight
+            || !TryMapPoint(p, out int x, out int y))
+        {
+            return false;
+        }
+
+        // 正の値が右方向
+        _scrollStats.ClicksSent += SendWheelClicks(delta, ref _horizontalWheelAccumulator, RfbButtons.WheelRight, RfbButtons.WheelLeft, x, y);
+        return true;
+    }
+
+    /// <summary>
+    /// ホイール量に「スクロール量」の倍率を掛け、120 単位で「押して離す」（VNC のボタン 4〜7）に変換して送る。段数を返す。
+    /// Mac の画面共有サーバーは 1 段あたりの移動量がとても小さい（タッチパッドで 1 回に 20 段以上送っても少ししか動かず、
+    /// 1 段ずつ間を空けて送っても変わらなかった。実機で確認）ので、倍率で段数を増やす。
+    /// </summary>
+    private int SendWheelClicks(int delta, ref int accumulator, RfbButtons positive, RfbButtons negative, int x, int y)
+    {
+        int clicks = 0;
+        accumulator += delta * _settings.ScrollMultiplier;
+        while (Math.Abs(accumulator) >= WheelStep)
+        {
+            RfbButtons wheel = accumulator > 0 ? positive : negative;
+            _session!.Client.SendPointerEvent(_buttons | wheel, x, y);
+            _session.Client.SendPointerEvent(_buttons, x, y);
+            accumulator -= Math.Sign(accumulator) * WheelStep;
+            clicks++;
+        }
+
+        return clicks;
     }
 
     private void OnRemoteLostMouseCapture(object sender, MouseEventArgs e)
@@ -1185,7 +1276,10 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Image 上の位置をリモートのピクセル座標に変換する（表示倍率に依存しない）。</summary>
-    private bool TryMapPoint(MouseEventArgs e, out int x, out int y)
+    private bool TryMapPoint(MouseEventArgs e, out int x, out int y) => TryMapPoint(e.GetPosition(RemoteImage), out x, out y);
+
+    /// <param name="p">RemoteImage 基準の位置（DIP）。</param>
+    private bool TryMapPoint(Point p, out int x, out int y)
     {
         x = y = 0;
         // 50% 表示ではビットマップが半分の大きさなので、Mac の画面の大きさ（RemoteWidth/Height）で換算する
@@ -1195,7 +1289,6 @@ public partial class MainWindow : Window
             return false;
         }
 
-        Point p = e.GetPosition(RemoteImage);
         x = Math.Clamp((int)(p.X * session.RemoteWidth / RemoteImage.ActualWidth), 0, session.RemoteWidth - 1);
         y = Math.Clamp((int)(p.Y * session.RemoteHeight / RemoteImage.ActualHeight), 0, session.RemoteHeight - 1);
         return true;
