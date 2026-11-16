@@ -8,7 +8,7 @@
     <AnalysisLevel>latest</AnalysisLevel>
 
     <!-- バージョンはここで一元管理する（ヘルプ画面とコマンドラインのバージョン表示に使う。XML コメント内に連続ハイフンは書けない） -->
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Product>rexRemote</Product>
     <Authors>rex0220</Authors>
     <Copyright>Copyright (c) 2026 rex0220</Copyright>
