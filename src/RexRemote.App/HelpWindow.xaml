@@ -85,6 +85,7 @@
 
                 <TextBlock Text="表示とボタン" Style="{StaticResource Heading}" />
                 <TextBlock Style="{StaticResource Body}">・表示: 「ウィンドウに合わせる」「50%（Retina 等倍。くっきり表示）」「100%（ドット等倍）」。マウスカーソルは手元で描きます。</TextBlock>
+                <TextBlock Style="{StaticResource Body}">・スクロール: マウスホイールとタッチパッドの縦・横スクロールを送ります。量は ⚙ の「スクロール量」で変えられます（標準は ×32。Mac の画面共有は 1 段あたりの移動量がとても小さいため）。</TextBlock>
                 <TextBlock Style="{StaticResource Body}">・パスワード入力: Mac のロック画面・ログイン画面に、接続に使ったパスワードを入力して Enter を押します。</TextBlock>
                 <TextBlock Style="{StaticResource Body}">・スクリーンショット: Mac の画面を元の解像度で PNG に保存し、クリップボードにもコピーします。</TextBlock>
 

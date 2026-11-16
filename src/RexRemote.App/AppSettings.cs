@@ -50,6 +50,20 @@ internal sealed class AppSettings
     /// <summary>回線の瞬断などで切れたら自動で再接続する。</summary>
     public bool AutoReconnect { get; set; } = true;
 
+    /// <summary>
+    /// スクロール量の倍率（1, 2, 4, 8, 16, 32）。Mac の画面共有はホイール 1 段あたりの移動量がとても小さく、
+    /// Surface のタッチパッドで Chrome をスクロールしたとき ×32 がちょうどよかった（実機で確認）ので、既定は 32。
+    /// </summary>
+    public int ScrollMultiplier
+    {
+        get => _scrollMultiplier;
+        set => _scrollMultiplier = value is 1 or 2 or 4 or 8 or 16 or 32 ? value : DefaultScrollMultiplier;
+    }
+
+    public const int DefaultScrollMultiplier = 32;
+
+    private int _scrollMultiplier = DefaultScrollMultiplier;
+
     /// <summary>履歴の先頭に追加する（同じ接続先は先頭へ移動し、上限を超えた古いものは捨てる）。</summary>
     public void AddRecentConnection(string host, int port)
     {
